@@ -1,0 +1,7 @@
+.git
+.gitignore
+*.ipynb
+demo_images
+test_images
+__pycache__
+*.pyc

@@ -1,0 +1,86 @@
+﻿{% extends 'base.html' %}
+{% block pagetitle %}LeafLens | Detect{% endblock pagetitle %}
+{% block head %}
+<style>
+    .detect-hero { background:linear-gradient(135deg,#eaf6e9 0%,#f7fbf4 65%); border-bottom:1px solid var(--line); }
+    .upload-zone { border:2px dashed #a9cdb6; border-radius:16px; min-height:310px; display:grid; place-items:center; cursor:pointer; transition:.2s ease; background:#fbfef9; }
+    .upload-zone:hover,.upload-zone.is-dragging { border-color:var(--forest); background:var(--mint); transform:translateY(-2px); }
+    .upload-zone.has-image { border-style:solid; padding:0; overflow:hidden; }
+    #preview { width:100%; height:310px; object-fit:cover; }
+    .progress-track { height:9px; background:#e7eee8; border-radius:20px; overflow:hidden; }
+    .progress-fill { height:100%; background:var(--forest); border-radius:20px; transition:width .7s ease; }
+    .result-panel { display:none; }
+    .result-panel.is-visible { display:block; animation:rise .45s ease both; }
+    .loader { width:18px; height:18px; border:2px solid rgba(255,255,255,.45); border-top-color:white; border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+{% endblock head %}
+{% block body %}
+<section class="detect-hero py-5"><div class="container py-lg-4"><div class="section-label mb-2">AI disease detection</div><h1 class="display-5 fw-bold mb-3">What is happening on your leaf?</h1><p class="lead text-muted mb-0" style="max-width:650px">Upload one clear image. The trained CNN will analyze it and return a prediction with practical guidance.</p></div></section>
+<section class="container py-5">
+    <div class="row g-4 align-items-start">
+        <div class="col-lg-7">
+            <div class="soft-card p-4 p-lg-5">
+                <div class="d-flex justify-content-between align-items-center mb-4"><div><div class="section-label">Step 1</div><h3 class="mb-0 mt-1">Upload a plant image</h3></div><span class="badge rounded-pill text-bg-light">JPG or PNG</span></div>
+                <form id="prediction-form" enctype="multipart/form-data">
+                    <input id="image-input" name="image" type="file" accept="image/png,image/jpeg,image/jpg" hidden>
+                    <label id="upload-zone" class="upload-zone w-100" for="image-input">
+                        <span id="upload-prompt" class="text-center p-4"><span class="d-block mx-auto mb-3" style="font-size:2.4rem;color:var(--forest)">+</span><strong class="d-block fs-5">Drop your leaf image here</strong><span class="text-muted small">or click to browse from your device</span></span>
+                        <img id="preview" alt="Selected plant leaf preview" hidden>
+                    </label>
+                    <div class="d-flex justify-content-between align-items-center mt-3"><span id="file-name" class="small text-muted">No image selected</span><button id="remove-btn" type="button" class="btn btn-link text-danger p-0" hidden>Remove image</button></div>
+                    <button id="analyze-btn" class="btn-primary-custom w-100 mt-4" type="submit" disabled><span id="analyze-label">Analyze plant</span><span id="analyze-loader" class="loader" hidden></span></button>
+                    <p id="error-message" class="text-danger small mt-3 mb-0" hidden></p>
+                </form>
+            </div>
+        </div>
+        <div class="col-lg-5"><div class="soft-card p-4"><div class="section-label">Before you upload</div><h4 class="mt-2">A better photo means a better signal.</h4><ul class="text-muted ps-3 mb-0"><li class="mb-2">Use natural or even lighting.</li><li class="mb-2">Keep one leaf in focus.</li><li class="mb-2">Avoid heavy filters and blur.</li><li>This is an educational prediction, not a replacement for expert diagnosis.</li></ul></div><div class="soft-card p-4 mt-3"><div class="d-flex gap-3"><span class="section-label">02</span><div><h5>AI analysis</h5><p class="text-muted small mb-0">Your image is resized and passed through the trained PyTorch CNN.</p></div></div><div class="d-flex gap-3 mt-3"><span class="section-label">03</span><div><h5>Clear result</h5><p class="text-muted small mb-0">Review the predicted class, confidence, and recommendations.</p></div></div></div></div>
+    </div>
+    <div id="result-panel" class="result-panel mt-5">
+        <div class="d-flex justify-content-between align-items-end mb-3"><div><div class="section-label">Analysis complete</div><h2 class="fw-bold mb-0">Your result</h2></div><button id="another-btn" class="btn-secondary-custom" type="button">Analyze another</button></div>
+        <div class="row g-4"><div class="col-lg-5"><div class="soft-card p-3"><img id="result-image" class="w-100 rounded-3" style="height:320px;object-fit:cover" alt="Analyzed plant leaf"></div></div><div class="col-lg-7"><div class="soft-card p-4 p-lg-5 h-100"><div class="d-flex justify-content-between gap-3"><div><span id="health-badge" class="badge rounded-pill mb-3"></span><h3 id="disease-name" class="fw-bold">-</h3></div><div class="text-end"><div id="confidence-value" class="display-6 fw-bold" style="color:var(--forest)">-</div><small class="text-muted">confidence</small></div></div><div class="progress-track mb-4"><div id="confidence-bar" class="progress-fill" style="width:0"></div></div><h5>What the model sees</h5><p id="disease-description" class="text-muted"></p><h5 class="mt-4">Recommended next step</h5><p id="recommendation" class="text-muted mb-0"></p><div id="supplement-box" class="border-top mt-4 pt-3" hidden><small class="text-muted">Related support</small><div class="d-flex justify-content-between align-items-center gap-3"><strong id="supplement-name"></strong><a id="buy-link" class="btn btn-sm btn-outline-success" target="_blank" rel="noopener">View option</a></div></div></div></div></div>
+    </div>
+</section>
+{% endblock body %}
+{% block scripts %}
+<script>
+    const form = document.getElementById('prediction-form');
+    const input = document.getElementById('image-input');
+    const zone = document.getElementById('upload-zone');
+    const preview = document.getElementById('preview');
+    const prompt = document.getElementById('upload-prompt');
+    const fileName = document.getElementById('file-name');
+    const removeButton = document.getElementById('remove-btn');
+    const analyzeButton = document.getElementById('analyze-btn');
+    const resultPanel = document.getElementById('result-panel');
+    const errorMessage = document.getElementById('error-message');
+
+    function showFile(file) {
+        if (!file || !file.type.startsWith('image/')) { showError('Please choose a JPG or PNG image.'); return; }
+        const reader = new FileReader();
+        reader.onload = event => { preview.src = event.target.result; preview.hidden = false; prompt.hidden = true; zone.classList.add('has-image'); fileName.textContent = file.name; removeButton.hidden = false; analyzeButton.disabled = false; errorMessage.hidden = true; };
+        reader.readAsDataURL(file);
+    }
+    function showError(message) { errorMessage.textContent = message; errorMessage.hidden = false; }
+    function clearFile() { input.value = ''; preview.src = ''; preview.hidden = true; prompt.hidden = false; zone.classList.remove('has-image'); fileName.textContent = 'No image selected'; removeButton.hidden = true; analyzeButton.disabled = true; }
+    input.addEventListener('change', () => showFile(input.files[0]));
+    removeButton.addEventListener('click', clearFile);
+    ['dragenter', 'dragover'].forEach(eventName => zone.addEventListener(eventName, event => { event.preventDefault(); zone.classList.add('is-dragging'); }));
+    ['dragleave', 'drop'].forEach(eventName => zone.addEventListener(eventName, event => { event.preventDefault(); zone.classList.remove('is-dragging'); }));
+    zone.addEventListener('drop', event => { const file = event.dataTransfer.files[0]; if (file) { input.files = event.dataTransfer.files; showFile(file); } });
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!input.files[0]) return;
+        analyzeButton.disabled = true; document.getElementById('analyze-label').textContent = 'Analyzing leaf...'; document.getElementById('analyze-loader').hidden = false; errorMessage.hidden = true;
+        try {
+            const response = await fetch('/api/predict', { method:'POST', body:new FormData(form) });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Prediction failed.');
+            document.getElementById('result-image').src = preview.src; document.getElementById('disease-name').textContent = data.disease; document.getElementById('confidence-value').textContent = data.confidence + '%'; document.getElementById('confidence-bar').style.width = data.confidence + '%'; document.getElementById('disease-description').textContent = data.description; document.getElementById('recommendation').textContent = data.recommendation;
+            const badge = document.getElementById('health-badge'); badge.textContent = data.healthy ? 'Healthy pattern' : 'Attention recommended'; badge.className = 'badge rounded-pill mb-3 ' + (data.healthy ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis');
+            const supplementBox = document.getElementById('supplement-box'); supplementBox.hidden = data.healthy && data.disease.includes('Background'); document.getElementById('supplement-name').textContent = data.supplement_name; document.getElementById('buy-link').href = data.buy_link; resultPanel.classList.add('is-visible'); resultPanel.scrollIntoView({ behavior:'smooth', block:'start' });
+        } catch (error) { showError(error.message); } finally { analyzeButton.disabled = false; document.getElementById('analyze-label').textContent = 'Analyze plant'; document.getElementById('analyze-loader').hidden = true; }
+    });
+    document.getElementById('another-btn').addEventListener('click', () => { resultPanel.classList.remove('is-visible'); clearFile(); window.scrollTo({ top: document.querySelector('.detect-hero').offsetTop, behavior:'smooth' }); });
+</script>
+{% endblock scripts %}

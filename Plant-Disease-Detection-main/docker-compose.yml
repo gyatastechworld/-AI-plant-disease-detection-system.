@@ -1,0 +1,11 @@
+services:
+  plant-disease-app:
+    build: .
+    ports:
+      - "7860:7860"
+    volumes:
+      - plant-disease-model:/app/models
+    restart: unless-stopped
+
+volumes:
+  plant-disease-model:
